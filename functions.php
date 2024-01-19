@@ -2,10 +2,13 @@
 /**
  * DevfolioX functions and definitions
  *
- * @link https://developer.wordpress.org/themes/basics/theme-functions/
  *
  * @package DevfolioX
  */
+
+ require ABSPATH . "vendor/stoutlogic/acf-builder/autoload.php";
+
+ use StoutLogic\AcfBuilder\FieldsBuilder;
 
 if ( ! defined( '_S_VERSION' ) ) {
 	// Replace the version number of the theme on each release.
@@ -176,3 +179,128 @@ if ( defined( 'JETPACK__VERSION' ) ) {
 	require get_template_directory() . '/inc/jetpack.php';
 }
 
+/** Custom Post Type */
+/**
+ * Initialize ACF Builder
+ */
+add_action('init', function () {
+	// Import ACF fields
+	foreach(glob(get_template_directory() . "/inc/fields/*.php") as $file){
+		require  $file;
+	}
+
+    register_post_type('door_type', [
+            'labels' => [
+                'name'                => __('Doors', 'cnc_autodoor'),
+                'singular_name'       => __('Door', 'cnc_autodoor'),
+                'menu_name'           => __('Doors', 'cnc_autodoor'),
+                'parent_item_colon'   => __('Parent Door', 'cnc_autodoor'),
+                'all_items'           => __('All Doors', 'cnc_autodoor'),
+                'view_item'           => __('View Doors', 'cnc_autodoor'),
+                'add_new_item'        => __('Add New Door', 'cnc_autodoor'),
+                'add_new'             => __('Add New', 'cnc_autodoor'),
+                'edit_item'           => __('Edit Door', 'cnc_autodoor'),
+                'update_item'         => __('Update Door', 'cnc_autodoor'),
+                'search_items'        => __('Search Doors', 'cnc_autodoor'),
+                'not_found'           => __('Not Found', 'cnc_autodoor'),
+                'not_found_in_trash'  => __('Not found in Trash', 'cnc_autodoor'),
+            ],
+            'public' => true,
+            'has_archive' => true,
+            'rewrite' => ['slug' => 'door'],
+            'show_in_rest' => true,
+            'menu_icon' => 'dashicons-excerpt-view',
+			'menu_position' => 3
+    ]);
+
+});
+
+
+// Add meny to api
+// add_theme_support( 'menus' );
+
+// Return formatted Primary Menu
+function top_nav_menu() {
+    $menu = wp_get_nav_menu_items('primary-menu');
+    $result = [];
+    foreach($menu as $item) {
+        $my_item = [
+            'name' => $item->title,
+            'href' => str_replace('/home/', '/', $item->url)
+        ];
+        $result[] = $my_item;
+    }
+    return $result;
+}
+// add endpoint
+add_action( 'rest_api_init', function() {
+    // top-nav menu
+    register_rest_route( 'wp/v2', 'primary-menu', array(
+        'methods' => 'GET',
+        'callback' => 'top_nav_menu',
+    ) );
+});
+
+
+
+/**
+ * Import Profile class to get AFt fields
+ */
+require get_template_directory() . '/classes/profile.php';
+
+// Profile endpoints
+add_action( 'rest_api_init', function() {
+    // top-nav menu
+    register_rest_route( 'wp/v2', 'personal-details', array(
+        'methods' => 'GET',
+        'callback' => function () {
+			return Profile::getPersonalDetails();
+		},
+    ) );
+});
+
+add_action( 'rest_api_init', function() {
+    // top-nav menu
+    register_rest_route( 'wp/v2', 'profile-social-media', array(
+        'methods' => 'GET',
+        'callback' => function () {
+			return Profile::getSocialMedia();
+		},
+    ) );
+});
+
+add_action( 'rest_api_init', function() {
+    // top-nav menu
+    register_rest_route( 'wp/v2', 'profile-contact-info', array(
+        'methods' => 'GET',
+        'callback' => function () {
+			return Profile::getConatctInfo();
+		},
+    ) );
+});
+
+// Add Contact Shortcode
+function contact_info_shortcode() {
+	$contactInfo = Profile::getConatctInfo();
+	$contactInfoOutput = '<ul class="contact-info">';
+	$contactInfoOutput .= '<li class="phone"><a href="tel:' . esc_attr($contactInfo['phone']) . '">' . esc_html($contactInfo['phone']) . '</a></li>';
+	$contactInfoOutput .= '<li class="email"><a href="mailto:' . esc_attr($contactInfo['email']) . '">' . esc_html($contactInfo['email']) . '</a></li>';
+	$contactInfoOutput .= '<li class="address"><span>' . esc_html($contactInfo['address']) . '</span></li>';
+	$contactInfoOutput .= '</ul>';
+	return $contactInfoOutput;
+}
+// register shortcode
+add_shortcode('contact_info', 'contact_info_shortcode');
+
+// Address shortcode
+add_shortcode('contact_address', function() {
+	return '<p class="perso-info">' . $address = get_field('address', 'option') . '</p>';
+});
+// Phone shortcode
+add_shortcode('contact_phone', function() {
+	return '<a href="tel:' . esc_attr(get_field('phone', 'option')) . '" class="perso-info" >' . esc_html(get_field('phone', 'option'))  . '</a>';
+});
+// Email shortcode
+add_shortcode('contact_email', function() {
+	return '<a href="mailto:' . esc_attr(get_field('email', 'option')) . '" class="perso-info">' . esc_html(get_field('email', 'option')) . '</a>';
+});
